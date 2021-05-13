@@ -377,7 +377,7 @@ pfind_find_results_t * pfind_find(pfind_options_t * lopt){
 
     int work_received = 0;
     int steal_neighbor = pfind_rank;
-    if (pending_work == 0 && phase < 2){
+    if (pending_work == 0 && current_dir.dir == NULL && phase < 2){
       // send request for job stealing
       if(opt->steal_from_next) {
         steal_neighbor = ((rand() % 2) && (pfind_rank > 0)) ? pfind_rank - 1 : rand() % pfind_size;
@@ -662,6 +662,10 @@ static int find_do_readdir(char *path, uint64_t dir_start, uint64_t dir_end) {
             }
             continue;
           }
+          char cur_path[PATH_MAX];
+          sprintf(cur_path, "%s/%s", path, entry->d_name);
+          find_do_lstat(cur_path);
+          continue;
         }
 
         // we need to perform a stat operation
@@ -671,18 +675,12 @@ static int find_do_readdir(char *path, uint64_t dir_start, uint64_t dir_end) {
             current_dir.dir = d;
           }
 
-          if(typ == 'd'){
-            static int printed_warning = 0;
-            if(! printed_warning){
-              printf("[%d] WARNING, utilizing excess queue for processing of the directory %s as the queue is full, supressing further messages. This may lead to suboptimal performance. Try to increase the queue size.\n", pfind_rank, entry->d_name);
-              printed_warning = 1;
-            }
-            enqueue_dir_excess(path, entry->d_name);
-          }else{
-            char cur_path[PATH_MAX];
-            sprintf(cur_path, "%s/%s", path, entry->d_name);
-            find_do_lstat(cur_path);
+          static int printed_warning = 0;
+          if(! printed_warning){
+            printf("[%d] WARNING, utilizing excess queue for processing of the directory %s as the queue is full, supressing further messages. This may lead to suboptimal performance. Try to increase the queue size.\n", pfind_rank, entry->d_name);
+            printed_warning = 1;
           }
+          enqueue_dir_excess(path, entry->d_name);
           return 1;
         }
     }
